@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: app-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+      - proxy
+    expose:
+      - "3000"
+
+  pg_backup:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.pg-backup
+    image: dental_services_back-pg-backup
+    container_name: app-pg-backup
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - backend
+    volumes:
+      - ${BACKUP_PATH:-/opt/backups/postgres}:/backups
+
+volumes:
+  pgdata:
+
+networks:
+  backend:
+    internal: true
+  proxy:
+    external: true
