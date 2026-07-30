@@ -41,6 +41,23 @@ export type UpsertUserByTelegramResult = {
   readonly isNewUser: boolean;
 };
 
+export type OAuthProvider = 'yandex' | 'vk';
+
+export type UpsertUserByOAuthParams = {
+  readonly provider: OAuthProvider;
+  readonly providerId: string;
+  readonly email: string | null;
+  readonly firstName: string | null;
+  readonly lastName: string | null;
+  readonly role: UserRole;
+};
+
+export type UpsertUserByOAuthResult = {
+  readonly id: number;
+  readonly role: UserRole;
+  readonly isNewUser: boolean;
+};
+
 export type UpdateProfileParams = {
   readonly userId: number;
   readonly firstName: string;
@@ -279,6 +296,79 @@ export class UserRepository {
         role: user.role,
         isNewUser,
       };
+    });
+  }
+
+  /**
+   * Вход/регистрация через внешний провайдер (Яндекс ID / VK ID).
+   * Порядок связывания аккаунта:
+   *  1) по идентификатору провайдера (yandex_id / vk_id) — повторный вход;
+   *  2) по email — привязка провайдера к уже существующему аккаунту;
+   *  3) иначе — создаётся новый пользователь.
+   */
+  async upsertByOAuth(
+    params: UpsertUserByOAuthParams,
+  ): Promise<UpsertUserByOAuthResult> {
+    const { provider, providerId, email, firstName, lastName, role } = params;
+    const providerLink =
+      provider === 'yandex' ? { yandexId: providerId } : { vkId: providerId };
+
+    return await this.prisma.$transaction(async (tx: TransactionClient) => {
+      // 1) Повторный вход по идентификатору провайдера
+      const byProvider = await tx.user.findFirst({
+        where: providerLink,
+        select: { id: true, role: true },
+      });
+      if (byProvider) {
+        return { id: byProvider.id, role: byProvider.role, isNewUser: false };
+      }
+
+      // 2) Привязка к существующему аккаунту с такой же почтой
+      if (email) {
+        const byEmail = await tx.user.findUnique({
+          where: { email },
+          select: { id: true, role: true },
+        });
+        if (byEmail) {
+          await tx.user.update({
+            where: { id: byEmail.id },
+            data: {
+              ...providerLink,
+              ...(firstName ? { firstName } : {}),
+              ...(lastName ? { lastName } : {}),
+            },
+          });
+          return { id: byEmail.id, role: byEmail.role, isNewUser: false };
+        }
+      }
+
+      // 3) Новый пользователь
+      const user = await tx.user.create({
+        data: {
+          ...providerLink,
+          email: email ?? undefined,
+          firstName: firstName ?? undefined,
+          lastName: lastName ?? undefined,
+          role,
+        },
+        select: { id: true, role: true, firstName: true, lastName: true },
+      });
+
+      if (role === UserRole.ORGANIZER) {
+        await tx.lecturer.create({
+          data: {
+            firstName: user.firstName ?? '',
+            lastName: user.lastName ?? '',
+            middleName: null,
+            position: 'Организатор',
+            yearsExperience: 0,
+            achievements: [],
+            userId: user.id,
+          },
+        });
+      }
+
+      return { id: user.id, role: user.role, isNewUser: true };
     });
   }
 

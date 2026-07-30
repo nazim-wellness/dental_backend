@@ -38,6 +38,8 @@ model User {
   password         String?   @map("password_hash")
   telegramId       String?   @unique @map("telegram_id")
   telegramUsername String?   @map("telegram_username")
+  yandexId         String?   @unique @map("yandex_id")
+  vkId             String?   @unique @map("vk_id")
   role             UserRole
   firstName        String?   @map("first_name")
   lastName         String?   @map("last_name")

@@ -8,8 +8,10 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { EmailAuthController } from './email-auth.controller';
 import { TelegramAuthController } from './telegram-auth.controller';
+import { OAuthAuthController } from './oauth-auth.controller';
 import { SmsService } from './sms.service';
 import { TelegramService } from './telegram.service';
+import { OAuthService } from './oauth.service';
 import { UserRepository } from '../repositories/user.repository';
 import { OtpCodeRepository } from '../repositories/otp-code.repository';
 import { JwtStrategy } from './jwt.strategy';
@@ -36,12 +38,18 @@ import { TokenService } from './token.service';
     AuthService,
     SmsService,
     TelegramService,
+    OAuthService,
     UserRepository,
     OtpCodeRepository,
     JwtStrategy,
     TokenService,
   ],
-  controllers: [AuthController, EmailAuthController, TelegramAuthController],
+  controllers: [
+    AuthController,
+    EmailAuthController,
+    TelegramAuthController,
+    OAuthAuthController,
+  ],
   exports: [JwtStrategy, PassportModule],
 })
 export class AuthModule {}

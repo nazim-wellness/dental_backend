@@ -39,6 +39,17 @@ export type AppConfig = {
   readonly smsRu: {
     readonly apiId: string;
   };
+  readonly oauth: {
+    readonly redirectBase: string;
+    readonly yandex: {
+      readonly clientId: string;
+      readonly clientSecret: string;
+    };
+    readonly vk: {
+      readonly clientId: string;
+      readonly clientSecret: string;
+    };
+  };
 };
 
 @Injectable()
@@ -156,6 +167,26 @@ export class ConfigService {
       },
       smsRu: {
         apiId: this.nestConfigService.get<string>('SMS_RU_API_ID', ''),
+      },
+      oauth: {
+        redirectBase:
+          this.nestConfigService.get<string>('OAUTH_REDIRECT_BASE') ??
+          this.nestConfigService.get<string>('APP_URL') ??
+          defaultAppUrl,
+        yandex: {
+          clientId: this.nestConfigService.get<string>('YANDEX_CLIENT_ID', ''),
+          clientSecret: this.nestConfigService.get<string>(
+            'YANDEX_CLIENT_SECRET',
+            '',
+          ),
+        },
+        vk: {
+          clientId: this.nestConfigService.get<string>('VK_CLIENT_ID', ''),
+          clientSecret: this.nestConfigService.get<string>(
+            'VK_CLIENT_SECRET',
+            '',
+          ),
+        },
       },
     };
   }

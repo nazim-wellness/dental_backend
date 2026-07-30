@@ -16,6 +16,8 @@ import { OtpCodeRepository } from '../repositories/otp-code.repository';
 import { UserRepository } from '../repositories/user.repository';
 import { TokenService, TokenResponse } from './token.service';
 import { TelegramService } from './telegram.service';
+import { OAuthService } from './oauth.service';
+import { OAuthCodeDto } from './dto/oauth-code.dto';
 
 const PASSWORD_HASH_ROUNDS = 10;
 
@@ -51,7 +53,48 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly tokenService: TokenService,
     private readonly telegramService: TelegramService,
+    private readonly oauthService: OAuthService,
   ) {}
+
+  async loginWithYandex(input: OAuthCodeDto): Promise<TokenResponse> {
+    const profile = await this.oauthService.fetchYandexUser(
+      input.code,
+      input.redirectUri,
+    );
+    const user = await this.userRepo.upsertByOAuth({
+      provider: 'yandex',
+      providerId: profile.providerId,
+      email: profile.email,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      role: input.role as UserRole,
+    });
+    return this.tokenService.generateTokens({
+      userId: user.id,
+      role: user.role,
+      isNewUser: user.isNewUser,
+    });
+  }
+
+  async loginWithVk(input: OAuthCodeDto): Promise<TokenResponse> {
+    const profile = await this.oauthService.fetchVkUser(
+      input.code,
+      input.redirectUri,
+    );
+    const user = await this.userRepo.upsertByOAuth({
+      provider: 'vk',
+      providerId: profile.providerId,
+      email: profile.email,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      role: input.role as UserRole,
+    });
+    return this.tokenService.generateTokens({
+      userId: user.id,
+      role: user.role,
+      isNewUser: user.isNewUser,
+    });
+  }
 
   async requestOtp(input: RequestOtpDto): Promise<RequestOtpResult> {
     const { phone } = input;

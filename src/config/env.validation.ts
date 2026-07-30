@@ -101,4 +101,13 @@ export const envValidationSchema = Joi.object({
   FIREBASE_CLIENT_EMAIL: Joi.string().optional(),
   // SMS.RU Configuration
   SMS_RU_API_ID: Joi.string().required(),
+  // OAuth: Яндекс ID
+  YANDEX_CLIENT_ID: Joi.string().optional(),
+  YANDEX_CLIENT_SECRET: Joi.string().optional(),
+  // OAuth: VK ID
+  VK_CLIENT_ID: Joi.string().optional(),
+  VK_CLIENT_SECRET: Joi.string().optional(),
+  // Базовый адрес для redirect_uri OAuth (например https://сайт.агенткомтос.рф).
+  // Если не задан — берётся APP_URL.
+  OAUTH_REDIRECT_BASE: Joi.string().uri().optional(),
 });
