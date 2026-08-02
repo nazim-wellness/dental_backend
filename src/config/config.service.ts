@@ -39,6 +39,14 @@ export type AppConfig = {
   readonly smsRu: {
     readonly apiId: string;
   };
+  readonly smtp: {
+    readonly host: string;
+    readonly port: number;
+    readonly secure: boolean;
+    readonly user: string;
+    readonly password: string;
+    readonly from: string;
+  };
   readonly oauth: {
     readonly redirectBase: string;
     readonly yandex: {
@@ -167,6 +175,16 @@ export class ConfigService {
       },
       smsRu: {
         apiId: this.nestConfigService.get<string>('SMS_RU_API_ID', ''),
+      },
+      smtp: {
+        host: this.nestConfigService.get<string>('SMTP_HOST', ''),
+        port: this.nestConfigService.get<number>('SMTP_PORT', 465),
+        secure: this.nestConfigService.get<boolean>('SMTP_SECURE', true),
+        user: this.nestConfigService.get<string>('SMTP_USER', ''),
+        password: this.nestConfigService.get<string>('SMTP_PASSWORD', ''),
+        from:
+          this.nestConfigService.get<string>('SMTP_FROM') ??
+          this.nestConfigService.get<string>('SMTP_USER', ''),
       },
       oauth: {
         redirectBase:

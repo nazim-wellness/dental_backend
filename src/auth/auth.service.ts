@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,16 +18,20 @@ import { TelegramLoginDto } from './dto/telegram-login.dto';
 import { ConfigService } from '../config/config.service';
 import { randomInt, createHash } from 'node:crypto';
 import { OtpCodeRepository } from '../repositories/otp-code.repository';
+import { EmailCodeRepository } from '../repositories/email-code.repository';
 import { UserRepository } from '../repositories/user.repository';
 import { TokenService, TokenResponse } from './token.service';
 import { TelegramService } from './telegram.service';
 import { OAuthService } from './oauth.service';
+import { EmailService } from './email.service';
 import { OAuthCodeDto } from './dto/oauth-code.dto';
+import { RequestEmailCodeDto, VerifyEmailCodeDto } from './dto/email-code.dto';
 
 const PASSWORD_HASH_ROUNDS = 10;
 
 const OTP_TTL_SECONDS = 300;
 const OTP_CODE_LENGTH = 6;
+const EMAIL_CODE_MAX_PER_HOUR = 5;
 const DEFAULT_DEV_PEPPER = 'development-pepper-not-for-production';
 const TEST_OTP_CODE = '000000';
 const SMS_BYPASS_PHONE = '+79999999999';
@@ -48,13 +57,88 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly otpRepo: OtpCodeRepository,
+    private readonly emailCodeRepo: EmailCodeRepository,
     private readonly userRepo: UserRepository,
     private readonly sms: SmsService,
+    private readonly email: EmailService,
     private readonly config: ConfigService,
     private readonly tokenService: TokenService,
     private readonly telegramService: TelegramService,
     private readonly oauthService: OAuthService,
   ) {}
+
+  private resolvePepper(): string {
+    const nodeEnv = this.config.getAppConfig().nodeEnv;
+    return nodeEnv === 'test'
+      ? 'test'
+      : nodeEnv === 'production'
+        ? (process.env.OTP_PEPPER ?? '')
+        : (process.env.OTP_PEPPER ?? DEFAULT_DEV_PEPPER);
+  }
+
+  /** Запросить код входа на email (passwordless). */
+  async requestEmailCode(
+    input: RequestEmailCodeDto,
+  ): Promise<RequestOtpResult> {
+    const email = input.email.trim().toLowerCase();
+
+    const since = new Date(Date.now() - 60 * 60 * 1000);
+    const recent = await this.emailCodeRepo.countRecent({
+      email,
+      purpose: 'LOGIN',
+      since,
+    });
+    if (recent >= EMAIL_CODE_MAX_PER_HOUR) {
+      throw new HttpException(
+        'Слишком много запросов кода. Попробуйте позже.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const code = generateOtpCode();
+    const codeHash = hashOtpCode(code, this.resolvePepper());
+    const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
+
+    await this.emailCodeRepo.create({
+      email,
+      codeHash,
+      purpose: 'LOGIN',
+      expiresAt,
+    });
+    await this.email.sendLoginCode(email, code);
+
+    const isProd = this.config.getAppConfig().nodeEnv === 'production';
+    return isProd ? {} : { code };
+  }
+
+  /** Проверить код из письма и войти/зарегистрироваться. */
+  async verifyEmailCode(input: VerifyEmailCodeDto): Promise<TokenResponse> {
+    const email = input.email.trim().toLowerCase();
+    const { code, role } = input;
+
+    const codeHash = hashOtpCode(code, this.resolvePepper());
+    const now = new Date();
+    const record = await this.emailCodeRepo.findValidLatest({
+      email,
+      purpose: 'LOGIN',
+      now,
+    });
+    if (!record || record.codeHash !== codeHash) {
+      throw new UnauthorizedException('Неверный или просроченный код');
+    }
+
+    await this.emailCodeRepo.markUsed(record.id, now);
+
+    const user = await this.userRepo.upsertByEmailVerified({
+      email,
+      role: role as UserRole,
+    });
+    return this.tokenService.generateTokens({
+      userId: user.id,
+      role: user.role,
+      isNewUser: user.isNewUser,
+    });
+  }
 
   async loginWithYandex(input: OAuthCodeDto): Promise<TokenResponse> {
     const profile = await this.oauthService.fetchYandexUser(

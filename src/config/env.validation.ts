@@ -110,4 +110,11 @@ export const envValidationSchema = Joi.object({
   // Базовый адрес для redirect_uri OAuth (например https://сайт.агенткомтос.рф).
   // Если не задан — берётся APP_URL.
   OAUTH_REDIRECT_BASE: Joi.string().uri().optional(),
+  // SMTP — отправка писем с кодом входа (например mail.ru)
+  SMTP_HOST: Joi.string().optional(),
+  SMTP_PORT: Joi.number().port().optional().default(465),
+  SMTP_SECURE: Joi.boolean().optional().default(true),
+  SMTP_USER: Joi.string().optional(),
+  SMTP_PASSWORD: Joi.string().optional(),
+  SMTP_FROM: Joi.string().optional(),
 });

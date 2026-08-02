@@ -80,6 +80,21 @@ model OtpCode {
   @@map("otp_codes")
 }
 
+model EmailCode {
+  id        Int        @id @default(autoincrement())
+  email     String
+  codeHash  String     @map("code_hash")
+  purpose   OtpPurpose
+  expiresAt DateTime   @map("expires_at")
+  usedAt    DateTime?  @map("used_at")
+  attempts  Int        @default(0)
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@index([email, purpose])
+  @@index([expiresAt])
+  @@map("email_codes")
+}
+
 model Specialty {
   id          Int      @id @default(autoincrement())
   name        String   @unique

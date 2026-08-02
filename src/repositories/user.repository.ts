@@ -372,6 +372,48 @@ export class UserRepository {
     });
   }
 
+  /**
+   * Вход/регистрация по подтверждённой почте (код на email, без пароля).
+   * Находит пользователя по email или создаёт нового.
+   */
+  async upsertByEmailVerified(params: {
+    email: string;
+    role: UserRole;
+  }): Promise<UpsertUserByOAuthResult> {
+    const { email, role } = params;
+
+    return await this.prisma.$transaction(async (tx: TransactionClient) => {
+      const existing = await tx.user.findUnique({
+        where: { email },
+        select: { id: true, role: true },
+      });
+      if (existing) {
+        return { id: existing.id, role: existing.role, isNewUser: false };
+      }
+
+      const user = await tx.user.create({
+        data: { email, role },
+        select: { id: true, role: true, firstName: true, lastName: true },
+      });
+
+      if (role === UserRole.ORGANIZER) {
+        await tx.lecturer.create({
+          data: {
+            firstName: user.firstName ?? '',
+            lastName: user.lastName ?? '',
+            middleName: null,
+            position: 'Организатор',
+            yearsExperience: 0,
+            achievements: [],
+            userId: user.id,
+          },
+        });
+      }
+
+      return { id: user.id, role: user.role, isNewUser: true };
+    });
+  }
+
   async updateProfile(params: UpdateProfileParams): Promise<void> {
     const {
       userId,

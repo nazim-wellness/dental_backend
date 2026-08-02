@@ -70,6 +70,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  get emailCode() {
+    return this.client.emailCode;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   get specialty() {
     return this.client.specialty;
   }
