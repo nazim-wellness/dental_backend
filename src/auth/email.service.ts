@@ -49,12 +49,26 @@ export class EmailService {
 
     const from = this.config.getAppConfig().smtp.from;
     const subject = 'Код для входа в EventDental';
+    // Ниже — отправка; ошибки SMTP пробрасываются наверх как EmailSendException,
+    // чтобы контроллер вернул понятный 400, а не 500.
     const text = `Ваш код для входа в EventDental: ${code}\n\nКод действует 5 минут. Если вы не запрашивали вход, просто проигнорируйте это письмо.`;
     const html =
       `<p>Ваш код для входа в <b>EventDental</b>:</p>` +
       `<p style="font-size:24px;font-weight:bold;letter-spacing:3px">${code}</p>` +
       `<p>Код действует 5 минут. Если вы не запрашивали вход, просто проигнорируйте это письмо.</p>`;
 
-    await transporter.sendMail({ from, to: email, subject, text, html });
+    try {
+      await transporter.sendMail({ from, to: email, subject, text, html });
+    } catch (err) {
+      this.logger.warn(`Не удалось отправить письмо на ${email}: ${String(err)}`);
+      throw new EmailSendException();
+    }
+  }
+}
+
+/// Письмо не удалось отправить (неверный адрес, отказ SMTP-сервера и т.п.).
+export class EmailSendException extends Error {
+  constructor() {
+    super('EMAIL_SEND_FAILED');
   }
 }

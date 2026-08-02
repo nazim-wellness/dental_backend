@@ -23,7 +23,7 @@ import { UserRepository } from '../repositories/user.repository';
 import { TokenService, TokenResponse } from './token.service';
 import { TelegramService } from './telegram.service';
 import { OAuthService } from './oauth.service';
-import { EmailService } from './email.service';
+import { EmailService, EmailSendException } from './email.service';
 import { OAuthCodeDto } from './dto/oauth-code.dto';
 import { RequestEmailCodeDto, VerifyEmailCodeDto } from './dto/email-code.dto';
 
@@ -105,7 +105,18 @@ export class AuthService {
       purpose: 'LOGIN',
       expiresAt,
     });
-    await this.email.sendLoginCode(email, code);
+
+    try {
+      await this.email.sendLoginCode(email, code);
+    } catch (err) {
+      if (err instanceof EmailSendException) {
+        throw new HttpException(
+          'Не удалось отправить письмо. Проверьте адрес почты.',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      throw err;
+    }
 
     const isProd = this.config.getAppConfig().nodeEnv === 'production';
     return isProd ? {} : { code };
